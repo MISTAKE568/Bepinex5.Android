@@ -1,0 +1,52 @@
+{
+  "name": "Bepinex5.Android",
+  "displayName": "Bepinex5.Android — Breaking Fork",
+  "version": "5.4.23.5+android.1",
+  "summary": "Game-agnostic BepInEx 5 LTS port for Unity Mono Android. Replaces Doorstop with a JNI shim, repacks the APK, and patches the Preloader.",
+  "unofficial": true,
+  "upstream": {
+    "project": "BepInEx",
+    "channel": "v5-lts",
+    "version": "5.4.23.5",
+    "repo": "https://github.com/BepInEx/BepInEx",
+    "license": "MIT"
+  },
+  "targets": {
+    "unityScriptingBackend": "Mono",
+    "unityVersions": [
+      "2019.4",
+      "2020.3",
+      "2021.3"
+    ],
+    "abis": [
+      "armeabi-v7a"
+    ],
+    "minSdk": 24
+  },
+  "breakingChanges": [
+    "Doorstop is not used; libbe5hook.so is loaded via System.loadLibrary from patched classes.dex",
+    "Game assemblies are unpacked from assets/bin/Data/Managed into app data on first launch",
+    "The shipped APK must be repacked and re-signed; there is no drop-in install",
+    "Preloader resolves the Managed directory at runtime instead of a build-time path",
+    "Assembly names and namespaces are intentionally unchanged for mod compatibility"
+  ],
+  "compatibility": {
+    "dropInReplacement": false,
+    "upstreamConfigCompatible": false,
+    "modDllModified": false
+  },
+  "layout": {
+    "source": "src/BepInEx/",
+    "bootstrapSource": "payload/bootstrap/",
+    "configTemplate": "payload/config/",
+    "shim": "shim/",
+    "injector": "injector/",
+    "buildScript": "build.py",
+    "coreBuildScript": "build_core.py",
+    "assetContract": "assets.py",
+    "ci": "ci/",
+    "tests": "tests/",
+    "out": "out/",
+    "assetPackOutput": "dist/"
+  }
+}

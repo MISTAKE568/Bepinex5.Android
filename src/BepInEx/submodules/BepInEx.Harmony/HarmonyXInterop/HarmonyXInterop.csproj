@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <Product>HarmonyXInterop</Product>
+        <TargetFramework>net35</TargetFramework>
+        <LangVersion>8</LangVersion>
+        <Version>1.0.0.0</Version>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="HarmonyX" Version="2.9.0" />
+        <PackageReference Include="Mono.Cecil" Version="0.10.4" />
+        <PackageReference Include="MonoMod.RuntimeDetour" Version="22.1.29.1" />
+        <PackageReference Include="MonoMod.Utils" Version="22.1.29.1" />
+    </ItemGroup>
+</Project>

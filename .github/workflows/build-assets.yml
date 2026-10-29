@@ -1,0 +1,189 @@
+name: build-assets
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  ABI: armeabi-v7a
+  ANDROID_PLATFORM: android-24
+  NDK_VERSION: 27.0.12077973
+  DOTNET_VERSION: 8.0.x
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  assets-arm32:
+    name: assets (armeabi-v7a)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    outputs:
+      pack_name: ${{ steps.pack.outputs.name }}
+      zip_sha256: ${{ steps.archive.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v7.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install build and test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mono-devel build-essential cmake ninja-build binutils zip
+
+      - name: Python syntax check
+        run: git ls-files -z '*.py' | xargs -0 python -m py_compile
+
+      - name: Source tree must not track build products
+        run: python ci/check_source_tree.py
+
+      - name: Workflow shell syntax
+        run: |
+          python ci/check_workflow_shell.py
+          bash -n ci/prepare_release_zip.sh
+
+      - name: Unit tests (including Mono fixtures)
+        run: python ci/run_tests.py
+
+      - uses: actions/setup-dotnet@v6.0.0
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ env.DOTNET_VERSION }}-${{ hashFiles('**/*.csproj', '**/nuget.config', 'src/BepInEx/Directory.Build.props', 'build_core.py') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-${{ env.DOTNET_VERSION }}-
+
+      - name: Managed core (net35)
+        run: |
+          dotnet --version
+          python build_core.py --configuration Release
+          python build_core.py --verify-only
+
+      - name: Bootstrap (netstandard2.0)
+        run: dotnet build payload/bootstrap/Be5Bootstrap.csproj -c Release -o build/bootstrap
+
+      - uses: android-actions/setup-android@v4.0.4
+        with:
+          packages: "ndk;${{ env.NDK_VERSION }}"
+
+      - name: Build arm32 shim
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/${NDK_VERSION}"
+          test -f "$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake"
+          cmake -S shim -B build/shim -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI="$ABI" \
+            -DANDROID_PLATFORM="$ANDROID_PLATFORM" \
+            -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/shim --parallel
+
+      - name: Assemble asset pack
+        id: pack
+        run: |
+          set -euo pipefail
+          SAFE_REF="$(printf '%s' "$GITHUB_REF_NAME" | tr -c 'A-Za-z0-9._-' '-' | sed 's/-*$//')"
+          test -n "$SAFE_REF" || SAFE_REF="unversioned"
+          PACK_NAME="bep5-android-arm32-assets-${SAFE_REF}"
+          echo "PACK_NAME=$PACK_NAME" >> "$GITHUB_ENV"
+          echo "name=$PACK_NAME" >> "$GITHUB_OUTPUT"
+          python assets.py assemble \
+            --out "dist/${PACK_NAME}" \
+            --repo . \
+            --core out/core \
+            --bootstrap build/bootstrap/Be5Bootstrap.dll \
+            --shim build/shim/libbe5hook.so \
+            --commit "$GITHUB_SHA" \
+            --ref "$GITHUB_REF_NAME" \
+            --repository "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --build-tool "dotnet=$(dotnet --version)" \
+            --build-tool "ndk=$NDK_VERSION" \
+            --build-tool "android_platform=$ANDROID_PLATFORM" \
+            --build-tool "python=$(python --version 2>&1)"
+
+      - name: Verify asset pack
+        run: python assets.py verify "dist/${PACK_NAME}"
+
+      - name: Assert shim architecture and JNI export
+        run: |
+          set -euo pipefail
+          elf="dist/${PACK_NAME}/shim/${ABI}/libbe5hook.so"
+          readelf -h "$elf" > build/shim-header.txt
+          cat build/shim-header.txt
+          grep -q 'Class:[[:space:]]*ELF32' build/shim-header.txt
+          grep -q 'Machine:[[:space:]]*ARM' build/shim-header.txt
+          nm -D --defined-only "$elf" > build/shim-exports.txt
+          grep -q 'JNI_OnLoad' build/shim-exports.txt
+
+      - name: Prepare and validate distributable ZIP
+        id: archive
+        run: |
+          bash ci/prepare_release_zip.sh "$PACK_NAME"
+          echo "sha256=$(sha256sum "dist/${PACK_NAME}.zip" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: bep5-assets-armeabi-v7a
+          path: dist/${{ steps.pack.outputs.name }}.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  release:
+    name: publish release
+    needs: assets-arm32
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      PACK_NAME: ${{ needs.assets-arm32.outputs.pack_name }}
+      PACK_SHA256: ${{ needs.assets-arm32.outputs.zip_sha256 }}
+    steps:
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          name: bep5-assets-armeabi-v7a
+          path: dist
+
+      - name: Verify downloaded ZIP
+        run: |
+          test -n "$PACK_NAME"
+          test -n "$PACK_SHA256"
+          printf '%s  %s\n' "$PACK_SHA256" "dist/${PACK_NAME}.zip" | sha256sum --check -
+          unzip -t "dist/${PACK_NAME}.zip"
+
+      - name: Publish verified ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          cat > release-notes.txt <<'EOF'
+          Bepinex5.Android — Breaking Fork
+
+          Android ARM32 asset pack with BepInEx core, Bootstrap, JNI loader and APK packaging scripts.
+          Extract the ZIP and follow README.md or PACKAGING.md. Credits and license texts are included.
+          EOF
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" \
+              --verify-tag \
+              --title "$GITHUB_REF_NAME" \
+              --notes-file release-notes.txt
+          cd dist
+          gh release upload "$GITHUB_REF_NAME" "${PACK_NAME}.zip" --clobber

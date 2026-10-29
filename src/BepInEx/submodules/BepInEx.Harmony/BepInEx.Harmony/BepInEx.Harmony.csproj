@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <Product>BepInEx.Harmony</Product>
+        <Description>Harmony wrapper for BepInEx</Description>
+        <Copyright>Copyright © Bepis 2019</Copyright>
+        <TargetFramework>net35</TargetFramework>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <Version>2.0.0.0</Version>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="HarmonyX" Version="2.0.6" PrivateAssets="all"/>
+    </ItemGroup>
+</Project>

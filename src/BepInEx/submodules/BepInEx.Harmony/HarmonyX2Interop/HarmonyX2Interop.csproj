@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <Product>HarmonyX2Interop</Product>
+        <TargetFramework>net35</TargetFramework>
+        <LangVersion>8</LangVersion>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <RootNamespace>HarmonyLib</RootNamespace>
+        <AssemblyName>0Harmony20</AssemblyName>
+        <Version>2.0.0.0</Version>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\HarmonyXInterop\HarmonyXInterop.csproj"/>
+    </ItemGroup>
+
+    <!-- https://stackoverflow.com/questions/52207524/disable-transitive-packagereference-dependency-for-a-specific-msbuild-project -->
+    <Target Name="HarmonyXAlias" BeforeTargets="FindReferenceAssembliesForReferences;ResolveReferences">
+        <ItemGroup>
+            <ReferencePath Condition="'%(ReferencePath.NuGetPackageId)' == 'HarmonyX'">
+                <Aliases>hx</Aliases>
+            </ReferencePath>
+        </ItemGroup>
+    </Target>
+</Project>

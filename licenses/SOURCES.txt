@@ -1,0 +1,25 @@
+Bundled license sources
+
+BepInEx.txt
+  BepInEx 5.4.23.5; copied from src/BepInEx/LICENSE during pack assembly.
+  https://github.com/BepInEx/BepInEx/tree/v5.4.23.5
+
+BepInEx.Harmony.txt
+  Vendored BepInEx.Harmony; copied from its LICENSE during pack assembly.
+  https://github.com/BepInEx/BepInEx.Harmony/tree/d4cdcb4
+
+HarmonyX.txt
+  LICENSE from the HarmonyX 2.9.0 NuGet package.
+  https://www.nuget.org/packages/HarmonyX/2.9.0
+
+MonoMod.txt
+  LICENSE from the MonoMod v22.01.29.01 source tree.
+  https://github.com/MonoMod/MonoMod/blob/v22.01.29.01/LICENSE
+
+MonoMod.Common.txt
+  LICENSE from the MonoMod.Common submodule used by MonoMod v22.01.29.01.
+  https://github.com/MonoMod/MonoMod.Common/tree/aceda0b4
+
+Mono.Cecil.txt
+  LICENSE.txt from Mono.Cecil 0.10.4.
+  https://github.com/jbevain/cecil/blob/0.10.4/LICENSE.txt
